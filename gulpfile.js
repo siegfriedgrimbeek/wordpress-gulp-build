@@ -11,47 +11,59 @@ const autoprefixer = require('gulp-autoprefixer');
 const concat = require('gulp-concat');
 const modernizr = require('gulp-modernizr');
 const runSequence = require('run-sequence');
-
-const gulp = require('gulp');
-const gutil = require('gulp-util');
 const ftp = require( 'vinyl-ftp' );
 
-//Vars
-const input = 'sass/**/*.scss';
-const output = './';
-const reload = browserSync.reload;
+//CSS
+const cssInput = 'sass/**/*.scss';
+const cssOutput = './';
 
 const sassOptions = {
   errLogToConsole: true,
   outputStyle: 'expanded'
 };
 
+//JS
+const jsInput = './js/*.js';
+const jsOutput = 'js/';
+
+//img
+const imgInput = 'img/**/*.+(png|jpg|jpeg|gif|svg)';
+const imgOutput = 'img/'
+
+//Variables
+const reload = browserSync.reload;
+
 const ftpDetails = {
   hostName: 'hostName',
   userName: 'userName',
-  password: 'password'
+  password: 'password',
+  directory: '/public_html/jytteelfferich.com/wp-content/themes/photogenic/'
+}
+
+//BrowserSync Settings
+const browserSyncSettings = {
+  files:[
+    cssInput,
+    jsInput,
+    './*.php'
+  ],
+  proxy: "localhost/jytteelfferich/",
+  notify: false
 }
 
 // browser-sync task for starting the server.
-gulp.task('browserSync', function() {
-    //watch files
-    var files = [
-    './**/*.scss',
-    './*.php',
-    './js/*.js'
-    ];
-
+gulp.task('browserSync', () => {
     //initialize browsersync
-    browserSync.init(files, {
+    browserSync.init(browserSyncSettings.files, {
     //browsersync with a php server
-    proxy: "localhost/jytteelfferich/",
-    notify: false
+    proxy: browserSyncSettings.proxy,
+    notify: browserSyncSettings.false
     });
 });
 
-gulp.task('sass', function(){
+gulp.task('sass', () => {
     return gulp
-    .src(input)
+    .src(cssInput)
     .pipe(sourcemaps.init())
     .pipe(sass(sassOptions).on('error', sass.logError))
     .pipe(sourcemaps.write())
@@ -65,88 +77,64 @@ gulp.task('sass', function(){
     }))
 });
 
-gulp.task('images', function(){
-  return gulp.src('img/**/*.+(png|jpg|jpeg|gif|svg)')
-  // Caching images that ran through imagemin
+gulp.task('images', () => {
+  return gulp.src(imgInput)
   .pipe(cache(imagemin({
       interlaced: true
     })))
-  .pipe(gulp.dest('img'))
+  .pipe(gulp.dest(imgOutput))
 });
 
-gulp.task('modernizr', function() {
-  gulp.src('./js/*.js')
+gulp.task('modernizr', () => {
+  gulp.src(jsInput)
     .pipe(modernizr())
-    .pipe(gulp.dest("js/"))
+    .pipe(gulp.dest(jsOutput))
 });
 
-gulp.task('map', function () {
-    return gulp.src('sass/**/*.scss')
+gulp.task('map', () => {
+    return gulp.src(cssInput)
         .pipe(sourcemaps.init())
         .pipe(sass())
         .pipe(sourcemaps.write())
-        .pipe(gulp.dest('./'));
+        .pipe(gulp.dest(cssOutput));
 });
 
-gulp.task('watch', function (){
-  gulp.watch(input, ['sass'])
- .on('change', function(event) {
+gulp.task('watch', () => {
+  gulp.watch(cssInput, ['sass'])
+ .on('change', (event) => {
     console.log('File ' + event.path + ' was ' + event.type + ', running tasks...');
-
-    	var conn = ftp.create( {
-        host: ftpDetails.hostName,
-        user: ftpDetails.userName,
-        password: ftpDetails.password,
-    		parallel: 1,
-    		log:gutil.log
-    	} );
-
-    	var globs = [
-        './js/customizer.js',
-        './style.css'
-    	];
-
-    	// using base = '.' will transfer everything to /public_html correctly
-    	// turn off buffering in gulp.src for best performance
-
-    	return gulp.src( globs, { base: '.', buffer: false } )
-    		.pipe( conn.newer( '/public_html/jytteelfferich.com/wp-content/themes/photogenic/' ) ); // only upload newer files
-    		.pipe( conn.dest( '/public_html/jytteelfferich.com/wp-content/themes/photogenic/' ) );
   })
 })
 
-gulp.task('build', function (callback) {
+gulp.task('build', (callback) => {
   runSequence(
     ['sass', 'images', 'modernizr','deploy' ],
     callback
   )
 })
 
-gulp.task('deploy', function () {
-  var conn = ftp.create( {
+gulp.task('deploy', () => {
+  const conn = ftp.create( {
     host: ftpDetails.hostName,
     user: ftpDetails.userName,
     password: ftpDetails.password,
     parallel: 1,
-    log:gutil.log
+    log:util.log
   } );
 
-  var globs = [
+  let globs = [
     './template-parts/*.php',
     './*.php',
     './js/*.js',
     './*.css'
   ];
 
-  // using base = '.' will transfer everything to /public_html correctly
-  // turn off buffering in gulp.src for best performance
-
   return gulp.src( globs, { base: '.', buffer: false } )
-    .pipe( conn.newer( '/public_html/jytteelfferich.com/wp-content/themes/photogenic/' ) ); // only upload newer files
-    .pipe( conn.dest( '/public_html/jytteelfferich.com/wp-content/themes/photogenic/' ) );
+    .pipe( conn.newer( ftpDetails.directory ) )
+    .pipe( conn.dest( ftpDetails.directory ) );
 });
 
-gulp.task('default', function (callback) {
+gulp.task('default', (callback) => {
   runSequence(['sass','map','browserSync', 'watch'],
     callback
   )

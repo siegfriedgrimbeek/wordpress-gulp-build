@@ -12,6 +12,7 @@ const concat = require('gulp-concat');
 const modernizr = require('gulp-modernizr');
 const runSequence = require('run-sequence');
 const ftp = require( 'vinyl-ftp' );
+const babel = require('gulp-babel');
 
 //CSS
 const cssInput = 'sass/**/*.scss';
@@ -61,6 +62,8 @@ gulp.task('browserSync', () => {
     });
 });
 
+
+//Compile Sass
 gulp.task('sass', () => {
     return gulp
     .src(cssInput)
@@ -71,12 +74,26 @@ gulp.task('sass', () => {
     .pipe(concat('style.css'))
     .pipe(minifyCSS())
     // Write the resulting CSS in the output folder
-    .pipe(gulp.dest(output))
+    .pipe(gulp.dest(cssOutput))
     .pipe(browserSync.reload({
       stream: true
     }))
 });
 
+//Compile JS
+gulp.task('js', () =>
+    gulp.src(jsInput)
+        .pipe(sourcemaps.init())
+        .pipe(babel({
+            presets: ['env'],
+            minified: true
+        }))
+        .pipe(concat('all.js'))
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest(jsOutput))
+);
+
+//Minify Images
 gulp.task('images', () => {
   return gulp.src(imgInput)
   .pipe(cache(imagemin({
@@ -85,11 +102,13 @@ gulp.task('images', () => {
   .pipe(gulp.dest(imgOutput))
 });
 
+//Create modernizr
 gulp.task('modernizr', () => {
   gulp.src(jsInput)
     .pipe(modernizr())
     .pipe(gulp.dest(jsOutput))
 });
+
 
 gulp.task('map', () => {
     return gulp.src(cssInput)
@@ -99,6 +118,7 @@ gulp.task('map', () => {
         .pipe(gulp.dest(cssOutput));
 });
 
+//Watch for changes
 gulp.task('watch', () => {
   gulp.watch(cssInput, ['sass'])
  .on('change', (event) => {
@@ -106,6 +126,7 @@ gulp.task('watch', () => {
   })
 })
 
+//Build Task
 gulp.task('build', (callback) => {
   runSequence(
     ['sass', 'images', 'modernizr','deploy' ],
@@ -113,6 +134,7 @@ gulp.task('build', (callback) => {
   )
 })
 
+//Deploy Task
 gulp.task('deploy', () => {
   const conn = ftp.create( {
     host: ftpDetails.hostName,
@@ -120,7 +142,7 @@ gulp.task('deploy', () => {
     password: ftpDetails.password,
     parallel: 1,
     log:util.log
-  } );
+  });
 
   let globs = [
     './template-parts/*.php',
@@ -134,6 +156,7 @@ gulp.task('deploy', () => {
     .pipe( conn.dest( ftpDetails.directory ) );
 });
 
+//Default Task
 gulp.task('default', (callback) => {
   runSequence(['sass','map','browserSync', 'watch'],
     callback
